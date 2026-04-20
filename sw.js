@@ -1,5 +1,5 @@
 const CACHE = 'timetracker-v1';
-const FILES = ['/', '/index.html'];
+const FILES = ['/timelog/', '/timelog/index.html'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)));
@@ -16,5 +16,5 @@ self.addEventListener('fetch', e => {
     const clone = res.clone();
     caches.open(CACHE).then(c => c.put(e.request, clone));
     return res;
-  }).catch(() => caches.match('/index.html'))));
+  }).catch(() => caches.match('/timelog/index.html'))));
 });
