@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<meta name="theme-color" content="#0f0f0f"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="TimeLog"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="icons/icon-192.png"/>
+<title>TimeLog</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg: #0f0f0f;
+  --surface: #181818;
+  --surface2: #222222;
+  --border: #2a2a2a;
+  --accent: #c8f560;
+  --accent2: #7fffd4;
+  --text: #f0f0f0;
+  --muted: #666;
+  --danger: #ff5c5c;
+  --r: 12px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bot: env(safe-area-inset-bottom, 0px);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Syne', sans-serif; overflow: hidden; }
+
+/* LAYOUT */
+#app { display: flex; flex-direction: column; height: 100dvh; padding-top: var(--safe-top); }
+#header { padding: 14px 20px 10px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+#header h1 { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; color: var(--accent); }
+#header .date { font-size: 12px; color: var(--muted); font-family: 'DM Mono', monospace; }
+
+/* TABS */
+#tabs { display: flex; padding: 0 20px; gap: 4px; flex-shrink: 0; border-bottom: 1px solid var(--border); }
+.tab { flex: 1; text-align: center; padding: 10px 4px; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; transition: color 0.2s, border-color 0.2s; }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* PAGES */
+#pages { flex: 1; overflow: hidden; position: relative; }
+.page { position: absolute; inset: 0; overflow-y: auto; padding: 16px 20px; padding-bottom: calc(20px + var(--safe-bot)); display: none; }
+.page.active { display: block; }
+
+/* TRACK PAGE */
+#active-bar { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 14px 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; min-height: 72px; }
+#active-bar.running { border-color: var(--accent); }
+.ab-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+.running .ab-dot { background: var(--accent); animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(0.8)} }
+.ab-info { flex: 1; }
+.ab-task { font-size: 15px; font-weight: 700; color: var(--text); }
+.ab-idle { font-size: 14px; color: var(--muted); }
+.ab-time { font-family: 'DM Mono', monospace; font-size: 22px; font-weight: 500; color: var(--accent); min-width: 70px; text-align: right; }
+#stop-btn { background: var(--danger); color: #fff; border: none; border-radius: 8px; padding: 10px 18px; font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700; cursor: pointer; flex-shrink: 0; }
+#stop-btn:active { transform: scale(0.96); }
+
+.section-label { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+.task-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 20px; }
+.task-btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 12px 8px 10px;
+  cursor: pointer;
+  text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  position: relative; overflow: hidden;
+}
+.task-btn:active { transform: scale(0.95); }
+.task-btn.active { background: #1a2200; border-color: var(--accent); }
+.task-btn.active::before { content: ''; position: absolute; inset: 0; background: var(--accent); opacity: 0.06; }
+.task-btn .t-abbr { font-size: 16px; font-weight: 800; color: var(--text); }
+.task-btn .t-name { font-size: 10px; color: var(--muted); font-weight: 500; }
+.task-btn .t-today { font-size: 10px; color: var(--accent2); font-family: 'DM Mono', monospace; margin-top: 1px; }
+.task-btn.active .t-abbr { color: var(--accent); }
+
+/* LOG PAGE */
+.log-day { margin-bottom: 20px; }
+.log-day-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+.log-day-title { font-size: 13px; font-weight: 700; color: var(--text); }
+.log-day-total { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; }
+.log-entry { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--surface); border-radius: 8px; margin-bottom: 4px; }
+.le-abbr { font-size: 13px; font-weight: 700; color: var(--accent); min-width: 36px; }
+.le-name { font-size: 13px; color: var(--text); flex: 1; }
+.le-dur { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--muted); }
+.le-time { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--border); margin-left: auto; }
+.le-del { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 14px; padding: 2px 4px; }
+.le-del:active { color: var(--danger); }
+.manual-row { display: flex; gap: 8px; margin-top: 12px; }
+.manual-row select, .manual-row input {
+  background: var(--surface); color: var(--text); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 10px; font-family: 'Syne', sans-serif; font-size: 13px;
+}
+.manual-row select { flex: 1; }
+.manual-row input { width: 72px; }
+.manual-row button {
+  background: var(--surface2); color: var(--text); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 14px; font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.manual-row button:active { background: var(--border); }
+
+/* WEEK PAGE */
+.week-selector { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.week-nav { background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 8px 14px; font-size: 18px; cursor: pointer; }
+.week-nav:active { background: var(--border); }
+.week-label { font-size: 13px; font-weight: 700; color: var(--text); }
+
+.week-summary { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 16px; margin-bottom: 16px; }
+.ws-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.ws-row:last-child { border-bottom: none; }
+.ws-task { font-size: 14px; font-weight: 600; }
+.ws-bar-wrap { flex: 1; margin: 0 12px; height: 4px; background: var(--border); border-radius: 2px; }
+.ws-bar { height: 4px; background: var(--accent); border-radius: 2px; transition: width 0.4s; }
+.ws-dur { font-family: 'DM Mono', monospace; font-size: 13px; color: var(--accent2); min-width: 52px; text-align: right; }
+
+.daily-chart { margin-bottom: 16px; }
+.day-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.day-name { font-size: 11px; font-weight: 700; color: var(--muted); min-width: 24px; }
+.day-bar-wrap { flex: 1; height: 28px; background: var(--surface); border-radius: 6px; overflow: hidden; display: flex; }
+.day-seg { height: 100%; transition: width 0.4s; }
+.day-total { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); min-width: 44px; text-align: right; }
+.chart-legend { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
+.legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+.stat-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+.stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 14px; }
+.sc-label { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+.sc-val { font-size: 22px; font-weight: 800; color: var(--text); }
+.sc-sub { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; margin-top: 2px; }
+
+.export-btn { width: 100%; background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: var(--r); padding: 14px; font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 12px; }
+.export-btn:active { background: var(--border); }
+
+/* SETTINGS PAGE */
+.settings-section { margin-bottom: 24px; }
+.task-manage-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.tm-row { display: flex; align-items: center; gap: 10px; background: var(--surface); border-radius: 8px; padding: 10px 12px; }
+.tm-abbr { font-size: 13px; font-weight: 700; color: var(--accent); min-width: 40px; }
+.tm-name { font-size: 13px; color: var(--text); flex: 1; }
+.tm-del { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 16px; }
+.tm-del:active { color: var(--danger); }
+.add-task-row { display: flex; gap: 8px; }
+.add-task-row input {
+  background: var(--surface); color: var(--text); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 12px; font-family: 'Syne', sans-serif; font-size: 13px;
+}
+.add-task-row input:first-child { width: 80px; }
+.add-task-row input:last-of-type { flex: 1; }
+.add-task-row button {
+  background: var(--accent); color: var(--bg); border: none;
+  border-radius: 8px; padding: 10px 16px; font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.add-task-row button:active { opacity: 0.85; }
+
+.danger-btn { width: 100%; background: none; border: 1px solid var(--danger); color: var(--danger); border-radius: var(--r); padding: 12px; font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; }
+.danger-btn:active { background: rgba(255,92,92,0.1); }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="header">
+    <h1>TimeLog</h1>
+    <span class="date" id="header-date"></span>
+  </div>
+  <div id="tabs">
+    <div class="tab active" data-page="track">Track</div>
+    <div class="tab" data-page="log">Log</div>
+    <div class="tab" data-page="week">Week</div>
+    <div class="tab" data-page="settings">Tasks</div>
+  </div>
+  <div id="pages">
+
+    <!-- TRACK -->
+    <div class="page active" id="page-track">
+      <div id="active-bar">
+        <div class="ab-dot"></div>
+        <div class="ab-info"><div class="ab-idle">Tap a task to start timing</div><div class="ab-task" style="display:none"></div></div>
+        <div class="ab-time" style="display:none">0:00</div>
+        <button id="stop-btn" style="display:none" onclick="stopTimer()">STOP</button>
+      </div>
+      <div class="section-label">Your tasks</div>
+      <div class="task-grid" id="task-grid"></div>
+    </div>
+
+    <!-- LOG -->
+    <div class="page" id="page-log">
+      <div class="section-label" style="margin-bottom:12px">Session history</div>
+      <div id="log-list"></div>
+      <div class="section-label" style="margin-top:4px">Add manual entry</div>
+      <div class="manual-row">
+        <select id="manual-task"></select>
+        <input type="number" id="manual-mins" placeholder="mins" min="1" max="1440"/>
+        <button onclick="addManual()">Add</button>
+      </div>
+    </div>
+
+    <!-- WEEK -->
+    <div class="page" id="page-week">
+      <div class="week-selector">
+        <button class="week-nav" onclick="shiftWeek(-1)">‹</button>
+        <span class="week-label" id="week-label"></span>
+        <button class="week-nav" onclick="shiftWeek(1)">›</button>
+      </div>
+      <div class="stat-cards" id="stat-cards"></div>
+      <div class="section-label">Daily totals</div>
+      <div class="daily-chart" id="daily-chart"></div>
+      <div class="chart-legend" id="chart-legend"></div>
+      <div class="section-label">By task</div>
+      <div class="week-summary" id="week-summary"></div>
+      <button class="export-btn" onclick="exportWeek()">↓ Export week as CSV</button>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="page" id="page-settings">
+      <div class="settings-section">
+        <div class="section-label">Manage tasks</div>
+        <div class="task-manage-list" id="task-manage-list"></div>
+        <div class="add-task-row">
+          <input type="text" id="new-abbr" placeholder="Abbr" maxlength="6"/>
+          <input type="text" id="new-name" placeholder="Full name"/>
+          <button onclick="addTask()">Add</button>
+        </div>
+      </div>
+      <div class="settings-section">
+        <div class="section-label">Data</div>
+        <button class="export-btn" onclick="exportAll()">↓ Export all data as CSV</button>
+        <button class="danger-btn" onclick="clearAll()">Clear all data</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ─── DATA ───────────────────────────────────────────────────────────────────
+const DEFAULT_TASKS = [
+  {abbr:'Slp',name:'Sleep'},{abbr:'Bath',name:'Bath'},{abbr:'Eat',name:'Eat'},
+  {abbr:'Misc',name:'Misc'},{abbr:'Trn',name:'Train'},{abbr:'Ss',name:'Ss'},
+  {abbr:'Sst',name:'Sst'},{abbr:'Sch',name:'School'},{abbr:'Clt',name:'Clt'},
+  {abbr:'Jn',name:'Jn'},{abbr:'Sr',name:'Sr'},{abbr:'Ai',name:'AI'},
+  {abbr:'An',name:'An'},{abbr:'Ed',name:'Education'},{abbr:'Rd',name:'Read'},
+  {abbr:'Biz',name:'Biz'}
+];
+const COLORS = ['#c8f560','#7fffd4','#ff9f43','#a29bfe','#fd79a8','#74b9ff','#55efc4','#ffeaa7','#e17055','#b2bec3','#6c5ce7','#00cec9','#fdcb6e','#e84393','#00b894','#636e72'];
+
+function load(k,d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch{ return d; } }
+function save(k,v) { localStorage.setItem(k, JSON.stringify(v)); }
+
+let tasks = load('tl_tasks', DEFAULT_TASKS);
+let log = load('tl_log', []);  // [{id,abbr,name,secs,start,end,manual?}]
+let activeTask = null, startTime = null, timerInterval = null;
+let weekOffset = 0;
+
+// ─── UTILS ──────────────────────────────────────────────────────────────────
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+function fmtDur(secs) {
+  const h = Math.floor(secs/3600), m = Math.floor((secs%3600)/60), s = secs%60;
+  if(h>0) return h+'h '+m+'m';
+  if(m>0) return m+'m';
+  return s+'s';
+}
+function fmtTime(ts) { return new Date(ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}); }
+function fmtDate(ts) { return new Date(ts).toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'}); }
+function dayKey(ts) { const d=new Date(ts); return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate(); }
+function getMonday(d) {
+  const dt = new Date(d); const day = dt.getDay();
+  const diff = (day===0?-6:1-day);
+  dt.setDate(dt.getDate()+diff); dt.setHours(0,0,0,0); return dt;
+}
+function weekRange(offset) {
+  const mon = getMonday(Date.now()); mon.setDate(mon.getDate()+offset*7);
+  const sun = new Date(mon); sun.setDate(sun.getDate()+6); sun.setHours(23,59,59,999);
+  return {start:mon.getTime(), end:sun.getTime(), mon, sun};
+}
+function colorFor(abbr) {
+  let idx = tasks.findIndex(t=>t.abbr===abbr);
+  if(idx<0) idx = abbr.charCodeAt(0)%COLORS.length;
+  return COLORS[idx % COLORS.length];
+}
+
+// ─── TIMER ──────────────────────────────────────────────────────────────────
+function toggleTask(abbr) {
+  if(activeTask===abbr) { stopTimer(); return; }
+  if(activeTask) stopTimer(false);
+  activeTask = abbr; startTime = Date.now();
+  const task = tasks.find(t=>t.abbr===abbr);
+  const bar = document.getElementById('active-bar');
+  bar.className = 'active-bar running'; bar.classList.add('running');
+  document.querySelector('.ab-idle').style.display='none';
+  const at = document.querySelector('.ab-task'); at.style.display=''; at.textContent = (task?.name||abbr);
+  const tv = document.querySelector('.ab-time'); tv.style.display='';
+  document.getElementById('stop-btn').style.display='';
+  timerInterval = setInterval(()=>{
+    const s=Math.floor((Date.now()-startTime)/1000);
+    tv.textContent = fmtDur(s);
+  },500);
+  renderTasks();
+}
+function stopTimer(doLog=true) {
+  if(!activeTask) return;
+  clearInterval(timerInterval);
+  if(doLog && startTime) {
+    const end=Date.now(), secs=Math.max(1,Math.floor((end-startTime)/1000));
+    const task=tasks.find(t=>t.abbr===activeTask);
+    log.push({id:uid(),abbr:activeTask,name:task?.name||activeTask,secs,start:startTime,end});
+    save('tl_log',log);
+  }
+  activeTask=null; startTime=null;
+  const bar=document.getElementById('active-bar'); bar.className=''; 
+  document.querySelector('.ab-idle').style.display='';
+  document.querySelector('.ab-task').style.display='none';
+  document.querySelector('.ab-time').style.display='none';
+  document.getElementById('stop-btn').style.display='none';
+  document.querySelector('.ab-time').textContent='0:00';
+  renderTasks(); renderLog(); renderWeek();
+}
+
+// ─── RENDER TASKS ───────────────────────────────────────────────────────────
+function renderTasks() {
+  const grid = document.getElementById('task-grid');
+  const today = dayKey(Date.now());
+  const todayLog = log.filter(e=>dayKey(e.start)===today);
+  grid.innerHTML = tasks.map(t=>{
+    const tot = todayLog.filter(e=>e.abbr===t.abbr).reduce((s,e)=>s+e.secs,0);
+    const isActive = activeTask===t.abbr;
+    return `<button class="task-btn${isActive?' active':''}" onclick="toggleTask('${t.abbr}')">
+      <span class="t-abbr">${t.abbr}</span>
+      <span class="t-name">${t.name}</span>
+      ${tot>0?`<span class="t-today">${fmtDur(tot)}</span>`:''}
+    </button>`;
+  }).join('');
+  // update manual select
+  const sel = document.getElementById('manual-task');
+  if(sel) sel.innerHTML = tasks.map(t=>`<option value="${t.abbr}">${t.abbr} – ${t.name}</option>`).join('');
+}
+
+// ─── RENDER LOG ─────────────────────────────────────────────────────────────
+function renderLog() {
+  const el = document.getElementById('log-list');
+  if(log.length===0){el.innerHTML='<div style="color:var(--muted);font-size:13px;padding:8px 0">No sessions yet</div>';return;}
+  // group by day descending
+  const days = {};
+  [...log].sort((a,b)=>b.start-a.start).forEach(e=>{
+    const k=dayKey(e.start); (days[k]=days[k]||[]).push(e);
+  });
+  el.innerHTML = Object.keys(days).sort((a,b)=>b>a?1:-1).map(dk=>{
+    const entries = days[dk];
+    const total = entries.reduce((s,e)=>s+e.secs,0);
+    const label = fmtDate(entries[0].start);
+    return `<div class="log-day">
+      <div class="log-day-header"><span class="log-day-title">${label}</span><span class="log-day-total">${fmtDur(total)}</span></div>
+      ${entries.map(e=>`<div class="log-entry">
+        <span class="le-abbr">${e.abbr}</span>
+        <span class="le-name">${e.name}</span>
+        <span class="le-dur">${fmtDur(e.secs)}</span>
+        <span class="le-time">${fmtTime(e.start)}–${fmtTime(e.end)}</span>
+        <button class="le-del" onclick="deleteEntry('${e.id}')">✕</button>
+      </div>`).join('')}
+    </div>`;
+  }).join('');
+}
+
+function deleteEntry(id) {
+  log = log.filter(e=>e.id!==id); save('tl_log',log);
+  renderLog(); renderTasks(); renderWeek();
+}
+function addManual() {
+  const abbr=document.getElementById('manual-task').value;
+  const mins=parseInt(document.getElementById('manual-mins').value);
+  if(!abbr||isNaN(mins)||mins<1) return;
+  const task=tasks.find(t=>t.abbr===abbr);
+  const now=Date.now(), secs=mins*60;
+  log.push({id:uid(),abbr,name:task?.name||abbr,secs,start:now-secs*1000,end:now,manual:true});
+  document.getElementById('manual-mins').value='';
+  save('tl_log',log);
+  renderLog(); renderTasks(); renderWeek();
+}
+
+// ─── RENDER WEEK ────────────────────────────────────────────────────────────
+function shiftWeek(d) { weekOffset+=d; renderWeek(); }
+
+function renderWeek() {
+  const {start,end,mon,sun} = weekRange(weekOffset);
+  const wlog = log.filter(e=>e.start>=start&&e.start<=end);
+  
+  // label
+  const fmt = d=>d.toLocaleDateString([],{month:'short',day:'numeric'});
+  document.getElementById('week-label').textContent = fmt(mon)+' – '+fmt(sun);
+
+  // stat cards
+  const totalSecs = wlog.reduce((s,e)=>s+e.secs,0);
+  const days = new Set(wlog.map(e=>dayKey(e.start))).size;
+  const avgPerDay = days>0?Math.round(totalSecs/7):0;
+  const topTask = (() => {
+    const m={}; wlog.forEach(e=>{m[e.abbr]=(m[e.abbr]||0)+e.secs;});
+    const top=Object.entries(m).sort((a,b)=>b[1]-a[1])[0];
+    return top?`${top[0]} (${fmtDur(top[1])})`:'—';
+  })();
+  document.getElementById('stat-cards').innerHTML = `
+    <div class="stat-card"><div class="sc-label">Total time</div><div class="sc-val">${fmtDur(totalSecs)}</div><div class="sc-sub">${wlog.length} sessions</div></div>
+    <div class="stat-card"><div class="sc-label">Daily avg</div><div class="sc-val">${fmtDur(avgPerDay)}</div><div class="sc-sub">tracked per day</div></div>
+    <div class="stat-card"><div class="sc-label">Active days</div><div class="sc-val">${days}/7</div><div class="sc-sub">this week</div></div>
+    <div class="stat-card"><div class="sc-label">Top task</div><div class="sc-val" style="font-size:16px">${topTask}</div><div class="sc-sub">&nbsp;</div></div>
+  `;
+
+  // daily stacked bars
+  const DAY_NAMES=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const dayTotals = Array.from({length:7},(_,i)=>{
+    const d=new Date(mon); d.setDate(d.getDate()+i);
+    const dk=dayKey(d.getTime());
+    const entries=wlog.filter(e=>dayKey(e.start)===dk);
+    const total=entries.reduce((s,e)=>s+e.secs,0);
+    const byTask={};
+    entries.forEach(e=>{byTask[e.abbr]=(byTask[e.abbr]||0)+e.secs;});
+    return {name:DAY_NAMES[i],total,byTask};
+  });
+  const maxDay = Math.max(...dayTotals.map(d=>d.total),1);
+  
+  // task totals for week (for color mapping)
+  const taskTotals={};
+  wlog.forEach(e=>{taskTotals[e.abbr]=(taskTotals[e.abbr]||0)+e.secs;});
+  
+  document.getElementById('daily-chart').innerHTML = dayTotals.map(d=>{
+    const segs = Object.entries(d.byTask).map(([abbr,secs])=>{
+      const pct=(secs/maxDay*100).toFixed(1);
+      return `<div class="day-seg" style="width:${pct}%;background:${colorFor(abbr)};opacity:0.85"></div>`;
+    }).join('');
+    const empty = d.total===0?`<div style="font-size:10px;color:var(--muted);padding:0 8px;line-height:28px">—</div>`:'';
+    return `<div class="day-row">
+      <span class="day-name">${d.name}</span>
+      <div class="day-bar-wrap">${segs}${empty}</div>
+      <span class="day-total">${d.total>0?fmtDur(d.total):''}</span>
+    </div>`;
+  }).join('');
+
+  // legend
+  const usedAbbrs = [...new Set(wlog.map(e=>e.abbr))];
+  document.getElementById('chart-legend').innerHTML = usedAbbrs.map(abbr=>{
+    const task=tasks.find(t=>t.abbr===abbr);
+    return `<div class="legend-item"><div class="legend-dot" style="background:${colorFor(abbr)}"></div>${task?.name||abbr}</div>`;
+  }).join('');
+
+  // task summary
+  const sorted = Object.entries(taskTotals).sort((a,b)=>b[1]-a[1]);
+  const maxTask = sorted[0]?.[1]||1;
+  document.getElementById('week-summary').innerHTML = sorted.length===0
+    ? '<div style="color:var(--muted);font-size:13px">No data for this week</div>'
+    : sorted.map(([abbr,secs])=>{
+        const task=tasks.find(t=>t.abbr===abbr);
+        const pct=(secs/maxTask*100).toFixed(1);
+        return `<div class="ws-row">
+          <span class="ws-task" style="color:${colorFor(abbr)}">${task?.name||abbr}</span>
+          <div class="ws-bar-wrap"><div class="ws-bar" style="width:${pct}%;background:${colorFor(abbr)}"></div></div>
+          <span class="ws-dur">${fmtDur(secs)}</span>
+        </div>`;
+      }).join('');
+}
+
+// ─── SETTINGS ───────────────────────────────────────────────────────────────
+function renderSettings() {
+  document.getElementById('task-manage-list').innerHTML = tasks.map(t=>`
+    <div class="tm-row">
+      <span class="tm-abbr">${t.abbr}</span>
+      <span class="tm-name">${t.name}</span>
+      <button class="tm-del" onclick="removeTask('${t.abbr}')">✕</button>
+    </div>`).join('');
+}
+function addTask() {
+  const abbr=document.getElementById('new-abbr').value.trim();
+  const name=document.getElementById('new-name').value.trim()||abbr;
+  if(!abbr) return;
+  if(tasks.find(t=>t.abbr.toLowerCase()===abbr.toLowerCase())) return;
+  tasks.push({abbr,name}); save('tl_tasks',tasks);
+  document.getElementById('new-abbr').value='';
+  document.getElementById('new-name').value='';
+  renderSettings(); renderTasks();
+}
+function removeTask(abbr) {
+  if(!confirm(`Remove "${abbr}"?`)) return;
+  tasks=tasks.filter(t=>t.abbr!==abbr); save('tl_tasks',tasks);
+  renderSettings(); renderTasks();
+}
+function clearAll() {
+  if(!confirm('Delete all logged data? This cannot be undone.')) return;
+  log=[]; save('tl_log',log);
+  renderLog(); renderTasks(); renderWeek();
+}
+
+// ─── EXPORT ─────────────────────────────────────────────────────────────────
+function exportCSV(rows, filename) {
+  const blob=new Blob([rows.join('\n')],{type:'text/csv'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; a.click();
+}
+function exportWeek() {
+  const {start,end,mon} = weekRange(weekOffset);
+  const wlog=log.filter(e=>e.start>=start&&e.start<=end);
+  const rows=['Task,Full name,Duration (mins),Start,End'];
+  wlog.forEach(e=>rows.push([e.abbr,e.name,Math.round(e.secs/60),new Date(e.start).toLocaleString(),new Date(e.end).toLocaleString()].join(',')));
+  exportCSV(rows,`timelog-week-${mon.toISOString().slice(0,10)}.csv`);
+}
+function exportAll() {
+  const rows=['Task,Full name,Duration (mins),Start,End'];
+  log.forEach(e=>rows.push([e.abbr,e.name,Math.round(e.secs/60),new Date(e.start).toLocaleString(),new Date(e.end).toLocaleString()].join(',')));
+  exportCSV(rows,'timelog-all.csv');
+}
+
+// ─── TABS ────────────────────────────────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('page-'+tab.dataset.page).classList.add('active');
+    if(tab.dataset.page==='week') renderWeek();
+    if(tab.dataset.page==='settings') renderSettings();
+    if(tab.dataset.page==='log') renderLog();
+  });
+});
+
+// ─── HEADER DATE ─────────────────────────────────────────────────────────────
+function updateDate() {
+  document.getElementById('header-date').textContent=new Date().toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'});
+}
+updateDate(); setInterval(updateDate,60000);
+
+// ─── SERVICE WORKER ──────────────────────────────────────────────────────────
+if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+renderTasks(); renderLog();
+</script>
+</body>
+</html>
